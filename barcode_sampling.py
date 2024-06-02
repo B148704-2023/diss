@@ -1,4 +1,5 @@
 import sys
+import os
 import random
 import argparse
 import pandas as pd
@@ -6,6 +7,10 @@ import numpy as np
 
 
 def main(args):
+
+    # make output dir if needed
+    os.makedirs(os.path.dirname(args.out), exist_ok=True)
+
     if args.seed is not None:
         np.random.seed(args.seed)
         random.seed(args.seed)
@@ -21,22 +26,91 @@ def main(args):
         print(f"Error: The file {args.barcodes} does not exist.")
         sys.exit(1)
 
-    for i in range(args.replicates):
+    for i in range(1, args.replicates+1):
         # If not fixed num_lineages, sample num_lineages from uniform dist
         if not args.num_lineages:
             n = np.random.randint(args.min_lineages, args.max_lineages + 1)
         else:
             n = args.num_lineages
 
+        print(f"Replicate {i} sampled {n} lineages...")
+
         # Sample lineages and assign frequencies
-        lin_freqs = sample_lineages(bcs, n, args.frequency_distribution,
+        lin_freqs = sample_lineages(bcs, n, args.dist,
                                     args.alpha)
 
         # Compute SNV frequencies
         snv_freqs = compute_snv_frequencies(bcs, lin_freqs)
 
-        # Display results (for now)
-        print(snv_freqs)
+        # Convert SNV frequencies to pandas DataFrame
+        snv_df = to_variants_table(snv_freqs, reference=args.ref,
+                                   fixed_depth=args.depth)
+
+        # Create output file names
+        variant_file = f"{args.out}_rep{i+1}.variants.tsv"
+        lineage_file = f"{args.out}_rep{i+1}.known_lineages.tsv"
+
+        # Write the variants table to file
+        snv_df.to_csv(variant_file, sep='\t', index=False)
+
+        # Write the known lineage frequencies to file
+        lin_freqs_df = pd.DataFrame.from_dict(lin_freqs, orient='index',
+                                              columns=['Frequency'])
+        lin_freqs_df.index.name = 'Lineage'
+        lin_freqs_df.to_csv(lineage_file, sep='\t')
+
+    print(f"Done! Wrote outputs using prefix {args.out}")
+
+
+def to_variants_table(snv_freqs, reference="SPOOF", fixed_depth=1000):
+    """
+    Converts the SNV frequencies dictionary to a variants table input for 
+    Freyja.
+
+    Parameters:
+    snv_freqs (dict): A dictionary containing SNV positions and their
+                      frequencies.
+    reference (str): The reference genome name. Default is "SPOOF".
+    fixed_depth (int): The total depth used to calculate DP values.
+                       Default is 1000.
+
+    Returns:
+    pd.DataFrame: A DataFrame containing the SNV frequencies formatted for
+                  Freyja.
+    """
+    data = []
+    for pos, freqs in snv_freqs.items():
+        ref = freqs['REF']
+        total_alt_freq = sum(freqs['ALT'].values())
+        ref_dp = fixed_depth * (1 - total_alt_freq)
+        for alt, alt_freq in freqs['ALT'].items():
+            alt_dp = fixed_depth * alt_freq
+            data.append({
+                'REGION': reference,
+                'POS': pos,
+                'REF': ref,
+                'ALT': alt,
+                'REF_DP': ref_dp,
+                'REF_RV': 0,  # Spoof
+                'REF_QUAL': 33,  # Spoof
+                'ALT_DP': alt_dp,
+                'ALT_RV': 0,  # Spoof
+                'ALT_QUAL': 33,  # Spoof
+                'ALT_FREQ': alt_freq,
+                'TOTAL_DP': fixed_depth,
+                'PVAL': 0,  # Spoof
+                'PASS': 'TRUE',  # Spoof
+                'GFF_FEATURE': 'NA',  # Spoof
+                'REF_CODON': 'NA',  # Spoof
+                'REF_AA': 'NA',  # Spoof
+                'ALT_CODON': 'NA',  # Spoof
+                'ALT_AA': 'NA',  # Spoof
+            })
+
+    snv_df = pd.DataFrame(data)
+    snv_df = snv_df.sort_values(by='POS')
+
+    return snv_df
 
 
 def compute_snv_frequencies(bcs, lineage_freqs, filter=True):
@@ -147,7 +221,7 @@ if __name__ == "__main__":
         help='Maximum number of lineages to sample (for range sampling)'
     )
     parser.add_argument(
-        '-f', '--frequency_distribution', choices=['uniform', 'skewed'],
+        '-f', '--dist', choices=['uniform', 'skewed'],
         default='uniform',
         help='Distribution of frequencies assigned to sampled lineages'
     )
@@ -159,6 +233,16 @@ if __name__ == "__main__":
         '-r', '--replicates', type=int, default=1,
         help='Number of replicates for sampling'
     )
+    parser.add_argument(
+        '-o', '--out', type=str, default="output/out",
+        help='Output file prefix'
+    )
+    parser.add_argument(
+        '-R', '--ref', type=str, default="NC_045512.2",
+        help="Reference genome name for output files")
+    parser.add_argument(
+        '-d', '--depth', type=int, default=1000,
+        help="Sequencing depth to use for output files")
 
     args = parser.parse_args()
     main(args)

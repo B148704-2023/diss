@@ -9,7 +9,6 @@ def sample_frequencies(n, alpha):
     alpha_values = np.linspace(alpha, 1, n)
     return np.random.dirichlet(alpha_values, size=1).flatten()
 
-
 # Run over num_lineages 2 to 5 and dirichlet alpha 0.1 to 10
 # at alpha=1 the proportions will be balanced
 alphas = np.linspace(0.1, 10, 50)
