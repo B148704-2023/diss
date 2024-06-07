@@ -38,12 +38,25 @@ options:
 
 Output table present in this directory within `./metadata/`
 
-### 2. fetch_and_format_srr.py
+### 2. populate_ont_reads.sh
 
-TBD
+First clone the [`benchmark-deconvolute`](https://github.com/enviro-lab/benchmark-deconvolute) repository:
 
-### 3. covid-analysis pipeline 
+```
+git clone https://github.com/enviro-lab/benchmark-deconvolute.git
+```
 
-TBD 
-<https://github.com/enviro-lab/covid-analysis> 
+You will need the NCBI Entrez Direct and SRA toolkits installed:
+```
+conda install -c bioconda entrez-direct sra-tools
+```
+
+Then move into the `Moon_etal/data` subdirectory and call the `populate_ont_reads.sh` script from the Moon et al. code repository
+```
+cd data
+bash ../benchmark-deconvolute/ont/populate_ont_reads.sh
+```
+
+### 3. create_bams.sh
+ 
 
