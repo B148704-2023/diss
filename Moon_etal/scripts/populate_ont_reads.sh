@@ -13,7 +13,7 @@ for plate in ${!plates[@]}; do
         mixture=${name%%-*}
         echo "Downloading $srr ($mixture) ($name)"
         prefetch $srr
-        fasterq-dump --split-files ${srr}/${srr}.sra
+        fasterq-dump --split-files --gzip ${srr}/${srr}
         rm -rf $srr
         if [[ -f ${srr}.fastq.gz ]]; then true
         elif [[ -f ${srr}.fastq ]]; then "zipping up ${srr}.fastq"; gzip ${srr}.fastq
