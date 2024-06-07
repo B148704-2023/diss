@@ -13,15 +13,15 @@ for plate in ${!plates[@]}; do
         mixture=${name%%-*}
         echo "Downloading $srr ($mixture) ($name)"
         prefetch $srr
-        fasterq-dump --split-files --gzip ${srr}/${srr}
+        fasterq-dump --split-files ${srr}/${srr}.sra
         rm -rf $srr
-        if [[ -f ${srr}.fastq.gz ]]; then true
-        elif [[ -f ${srr}.fastq ]]; then "zipping up ${srr}.fastq"; gzip ${srr}.fastq
+        if [[ -f ${srr}.sra.fastq.gz ]]; then true
+        elif [[ -f ${srr}.sra.fastq ]]; then "zipping up ${srr}.fastq"; gzip ${srr}.sra.fastq
         else echo "Missing fastq for $srr ($mixture)"
         fi
         # write fastq to porechop_kraken_trimmed
         echo "Writing: $mixture"
         mkdir -p "MixedControl-${plate}-fastqs/output/porechop_kraken_trimmed"
-        mv $srr.fastq.gz MixedControl-${plate}-fastqs/output/porechop_kraken_trimmed/$mixture.fastq.gz
+        mv $srr.sra.fastq.gz MixedControl-${plate}-fastqs/output/porechop_kraken_trimmed/$mixture.fastq.gz
     done
 done
