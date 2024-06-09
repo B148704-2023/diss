@@ -20,15 +20,15 @@ for plate in "${!plates[@]}"; do
         else
             echo "Downloading $srr ($mixture) ($name)"
             prefetch "$srr"
-            fasterq-dump --outdir "$output_dir" "${srr}/${srr}.sra"
+            fasterq-dump --split-files -f "${srr}"
 
             # Check for presence of expected files and move them to the final destination
-            if [[ -f "${output_dir}/${srr}.fastq.gz" ]]; then
-                mv "${output_dir}/${srr}.fastq.gz" "${output_dir}/${mixture}.fastq.gz"
-            elif [[ -f "${output_dir}/${srr}.fastq" ]]; then
+            if [[ -f "${srr}.fastq.gz" ]]; then
+                mv "${srr}.fastq.gz" $mixture".fastq.gz"
+            elif [[ -f "${srr}.fastq" ]]; then
                 echo "zipping up ${srr}.fastq"
-                gzip "${output_dir}/${srr}.fastq"
-                mv "${output_dir}/${srr}.fastq.gz" "${output_dir}/${mixture}.fastq.gz"
+                gzip "${srr}.fastq"
+                mv "${srr}.fastq.gz" $output_dir/$mixture".fastq.gz"
             else
                 echo "Missing fastq for $srr ($mixture)"
             fi
