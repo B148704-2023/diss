@@ -9,7 +9,7 @@ def create_directory(path):
     if not os.path.exists(path):
         os.makedirs(path)
 
-def download_and_gzip(sra_run_id, mixture, output_path):
+def download_and_gzip(sra_run_id, mixture, output_path, max_retries=3):
     fastq_path = f"{output_path}/{sra_run_id}.fastq"
     gzipped_path = f"{output_path}/{mixture}.fastq.gz"
 
@@ -17,11 +17,22 @@ def download_and_gzip(sra_run_id, mixture, output_path):
         print(f"File {gzipped_path} already exists. Skipping download and compression.")
         return
 
-    if not os.path.exists(fastq_path):
-        print(f"Downloading {sra_run_id} to {fastq_path}")
-        subprocess.run(['fasterq-dump', sra_run_id, '--stdout'], stdout=open(fastq_path, 'w'))
-    else:
-        print(f"Found existing file {fastq_path}. Skipping download.")
+    download_attempts = 0
+    while download_attempts < max_retries:
+        if not os.path.exists(fastq_path):
+            print(f"Downloading {sra_run_id} to {fastq_path} (Attempt {download_attempts + 1})")
+            result = subprocess.run(['fasterq-dump', sra_run_id, '--stdout'], stdout=open(fastq_path, 'w'))
+            if result.returncode == 0:
+                break
+            else:
+                download_attempts += 1
+                os.remove(fastq_path)  # Clean up any partial or failed downloads
+                if download_attempts == max_retries:
+                    print(f"Failed to download {sra_run_id} after {max_retries} attempts.")
+                    return
+        else:
+            print(f"Found existing file {fastq_path}. Skipping download.")
+            break
 
     print(f"Compressing {fastq_path} to {gzipped_path}")
     with open(fastq_path, 'rb') as f_in, gzip.open(gzipped_path, 'wb') as f_out:
@@ -40,7 +51,7 @@ def process_data(file_path, base_directory):
         output_directory = os.path.join(base_directory, f"MixedControl-{sample_name}-fastqs/output/porechop_kraken_trimmed")
         create_directory(output_directory)
 
-        print(f"Processing {sra_run_id} from lane {sample_name}")
+        print(f"Processing {sra_run_id} from sample {sample_name}")
         download_and_gzip(sra_run_id, mixture, output_directory)
 
 if __name__ == "__main__":
