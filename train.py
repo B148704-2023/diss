@@ -8,11 +8,10 @@ import sys
 
 
 # TODO: Need to add options controlling parameter space
-# TODO: Can probably skip uniform as an option as this is covered by
-#       alpha=1.0 in Dirichlet case
-# TODO: (later) We can add Gaussian noise to the lineage_freqs to increase 
+# TODO: We can add Gaussian noise to the lineage_freqs to increase 
 #       variation in the training set, but need to make sure these sum to 1
 #       after adding noise.
+# NOTE: Skipped the uniform case as this is covered by dirichlet alpha_start=1
 def generate_training_examples(barcodes, n):
     """
     Generate training examples of known lineage frequencies and 
@@ -41,17 +40,17 @@ def generate_training_examples(barcodes, n):
     snv_freqs = []
 
     for i in range(n):
-        num_lineages_sampled = random.randint(5, 10)  # The number of lineages sampled
-        frequency_distribution = random.choice(['uniform', 'dirichlet'])  # Balanced vs skewed sampling
+        num_lineages_sampled = random.randint(5, 30)  # The number of lineages sampled
 
         sampled_indices = random.sample(range(num_lineages_total), num_lineages_sampled)
 
-        if frequency_distribution == 'uniform':
-            frequencies = np.ones(num_lineages_sampled) / num_lineages_sampled  # Balanced
-        elif frequency_distribution == 'dirichlet':
-            alpha_start = np.random.uniform(1.0, 20.0)
-            alphas = np.linspace(alpha_start, 1.0, num_lineages_sampled)  # Skewed
-            frequencies = np.random.dirichlet(alphas)
+        # frequency_distribution = random.choice(['uniform', 'dirichlet'])
+        # if frequency_distribution == 'uniform':
+        #     frequencies = np.ones(num_lineages_sampled) / num_lineages_sampled
+        # elif frequency_distribution == 'dirichlet':
+        alpha_start = np.random.uniform(1.0, 200.0)
+        alphas = np.linspace(alpha_start, 1.0, num_lineages_sampled)  # Skewed
+        frequencies = np.random.dirichlet(alphas)
 
         # Zeros to store the lineage freqs
         lineage_freqs = np.zeros(num_lineages_total)
@@ -79,7 +78,7 @@ def generate_training_examples(barcodes, n):
         # print(snv_freq[nonzero_indices])
         # sys.exit()
 
-        if i % 50 == 0:
+        if i % 1000 == 0 and i != 0:
             print(f'Generated {i} training examples...')
 
     end_time = time.time()
