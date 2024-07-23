@@ -1,5 +1,6 @@
 import os 
 import sys 
+import logging
 
 import torch
 from torch import nn, optim
@@ -16,7 +17,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from abc import ABC, abstractmethod
 
 class MLP(nn.Module):
-    def __init__(self, input_size, num_hidden_layers, hidden_layer_size, output_size, activation, dropout=0):
+    def __init__(self, input_size, num_hidden_layers, output_size, dropout=0):
         super(MLP, self).__init__()
         layers = []
         in_features = input_size
@@ -33,14 +34,7 @@ class MLP(nn.Module):
             layers.append(nn.BatchNorm1d(out_features))
 
             # activation
-            if activation == 'ReLU':
-                layers.append(nn.ReLU())
-            elif activation == 'LeakyReLU':
-                layers.append(nn.LeakyReLU())
-            elif activation == 'Tanh':
-                layers.append(nn.Tanh())
-            elif activation == 'Sigmoid':
-                layers.append(nn.Sigmoid())
+            layers.append(nn.Sigmoid())
 
             if dropout > 0:
                 layers.append(nn.Dropout(p=dropout))
@@ -174,7 +168,6 @@ class DeconvolutionModel(ABC):
 class SNV2LinFreqs(DeconvolutionModel):
     DEFAULT_CONFIG = {
         'num_hidden_layers': (1, 5),
-        'hidden_layer_size': (16, 256),
         'dropout': (0, 0.5),
         'lr': (1e-5, 1e-1),
         'weight_decay': (1e-5, 1e-1),
@@ -198,8 +191,6 @@ class SNV2LinFreqs(DeconvolutionModel):
         parsed_config = self.parse_config(config)
 
         num_hidden_layers = trial.suggest_int('num_hidden_layers', *parsed_config['num_hidden_layers'])
-        hidden_layer_size = trial.suggest_int('hidden_layer_size', *parsed_config['hidden_layer_size'])
-        activation = trial.suggest_categorical('activation', ['ReLU', 'Tanh', 'Sigmoid'])
         dropout = trial.suggest_float('dropout', *parsed_config['dropout'])
         weight_decay = trial.suggest_float('weight_decay', *parsed_config['weight_decay'])
         learning_rate = trial.suggest_float('lr', *parsed_config['lr'], log=True)
@@ -208,9 +199,7 @@ class SNV2LinFreqs(DeconvolutionModel):
 
         model = MLP(input_size=self.input_size, 
                     num_hidden_layers=num_hidden_layers, 
-                    hidden_layer_size=hidden_layer_size, 
                     output_size=self.output_size, 
-                    activation=activation,
                    dropout=dropout).to(self.device)
 
         train_losses, val_losses = model.fit(
@@ -229,17 +218,13 @@ class SNV2LinFreqs(DeconvolutionModel):
 
     def fit(self, params, epochs=500, patience=10):
         num_hidden_layers = params['num_hidden_layers']
-        hidden_layer_size = params['hidden_layer_size']
         dropout = params['dropout']
         learning_rate = params['lr']
         weight_decay = params['weight_decay']
-        activation = params['activation']
         
         self.model = MLP(input_size=self.input_size, 
                     output_size=self.output_size, 
-                    num_hidden_layers=num_hidden_layers, 
-                    hidden_layer_size=hidden_layer_size, 
-                    activation=activation).to(self.device)
+                    num_hidden_layers=num_hidden_layers).to(self.device)
 
         self.train_losses, self.val_losses = self.model.fit(
             self.train_loader, 
@@ -269,7 +254,12 @@ class SNV2LinFreqs(DeconvolutionModel):
             pruner = None
         sampler = TPESampler(n_startup_trials=warmup_steps)
 
-        self.study = optuna.create_study(direction='minimize', sampler=sampler, pruner=pruner)
+        optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
+        self.study_name = "hyper_param_tuning_snv2linfreqs"  # Unique identifier of the study.
+        self.storage_name = "sqlite:///{}.db".format(self.study_name)
+
+        self.study = optuna.create_study(direction='minimize', sampler=sampler, pruner=pruner, 
+                                         study_name=self.study_name, storage=self.storage_name)
         self.study.optimize(lambda trial: self._objective(trial, config), n_trials=n_trials)
 
         # Print results
@@ -328,9 +318,7 @@ class SNV2LinFreqs(DeconvolutionModel):
     def load_model(self, file_path):
         self.model = MLP(input_size=self.input_size, 
                     num_hidden_layers=self.num_hidden_layers, 
-                    hidden_layer_size=self.hidden_layer_size, 
-                    output_size=self.output_size, 
-                    activation=self.activation,
+                    output_size=self.output_size,
                     dropout=self.dropout)
         self.model.load_state_dict(torch.load(file_path))
     
